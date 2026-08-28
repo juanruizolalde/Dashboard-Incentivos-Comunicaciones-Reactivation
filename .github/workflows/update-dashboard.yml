@@ -1,0 +1,42 @@
+name: Actualizar dashboard Reactivation
+
+on:
+  schedule:
+    # 14:00 UTC = 11:00 AR (deja 1h de margen despues de que Aleph corre ~10:00 AR)
+    - cron: "0 14 * * *"
+  workflow_dispatch: {}   # permite correrlo manualmente desde la pestaña "Actions"
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependencias
+        run: pip install -r scripts/requirements.txt
+
+      - name: Actualizar index.html desde el Google Sheet
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+        run: python scripts/update_dashboard.py
+
+      - name: Commit y push si hubo cambios
+        run: |
+          git config user.name "dashboard-bot"
+          git config user.email "actions@github.com"
+          if git diff --quiet -- index.html; then
+            echo "Sin cambios, nada para commitear."
+          else
+            git add index.html
+            git commit -m "Actualizacion automatica del dashboard ($(date -u +'%Y-%m-%d %H:%M UTC'))"
+            git push
+          fi
